@@ -12,8 +12,12 @@ from matplotlib import font_manager
 
 # 尝试显式加载中文字体，优先使用已安装的 Noto CJK
 FONT_CANDIDATES = [
+    # Debian/Ubuntu fonts-noto-cjk 常见路径
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    # 其他可能路径
     "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
     "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf",
     "/usr/share/fonts/truetype/arphic/ukai.ttc",
