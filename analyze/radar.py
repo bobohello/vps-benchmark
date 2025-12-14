@@ -9,6 +9,16 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+# 指定中文字体优先级，避免缺字警告（需已安装 fonts-noto-cjk 或等价字体）
+plt.rcParams["font.family"] = [
+    "Noto Sans CJK SC",
+    "Noto Sans SC",
+    "Noto Sans",
+    "SimHei",
+    "DejaVu Sans",
+]
+plt.rcParams["axes.unicode_minus"] = False
+
 DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "disk", "route"]
 LABELS = {
     "latency": "延迟",
@@ -54,5 +64,5 @@ def main():
 
 
 if __name__ == "__main__":
-  main()
+    main()
 
