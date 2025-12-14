@@ -14,15 +14,20 @@ max_rtt_ms=0
 
 if command -v traceroute >/dev/null 2>&1; then
   while IFS= read -r line; do
-    hop="$(awk '{print $1}' <<<"$line")"
+    # 仅处理以数字开头的行（跳过 "traceroute to ..." 头行）
+    first_field="$(awk '{print $1}' <<<"$line")"
+    [[ "$first_field" =~ ^[0-9]+$ ]] || continue
+
+    hop="$first_field"
     ip="$(awk '{print $2}' <<<"$line")"
-    rtt="$(awk '{for(i=3;i<=NF;i++){if($i ~ /ms/){print $i; break}}}' <<<"$line" | sed 's/ms//')"
+    rtt="$(awk '{for(i=3;i<=NF;i++){if($i ~ /ms/){gsub(/ms/,"",$i); print $i; break}}}' <<<"$line")"
     rtt=${rtt:-0}
-    [ -z "$hop" ] && continue
+
     hop_count=$hop
     if (( $(printf "%.0f" "$rtt") > $(printf "%.0f" "$max_rtt_ms") )); then
       max_rtt_ms="$rtt"
     fi
+
     hop_entries="${hop_entries}{
       \"hop\": ${hop},
       \"ip\": $(json_escape "${ip:-*}"),
