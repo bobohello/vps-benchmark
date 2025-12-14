@@ -41,13 +41,16 @@ if loaded_font:
     font_family.append(loaded_font.stem)
 font_family += [
     "Noto Sans CJK SC",
-    "Noto Sans SC",
+    "Noto Sans CJK JP",
+    "Noto Sans CJK TC",
     "Noto Sans",
     "SimHei",
     "DejaVu Sans",
 ]
 
-plt.rcParams["font.family"] = font_family
+# 强制设置 sans-serif 列表，确保中文可用
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = font_family
 plt.rcParams["axes.unicode_minus"] = False
 
 DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "disk", "route"]
