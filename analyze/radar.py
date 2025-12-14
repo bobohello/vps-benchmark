@@ -8,15 +8,42 @@ from math import pi
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 
-# 指定中文字体优先级，避免缺字警告（需已安装 fonts-noto-cjk 或等价字体）
-plt.rcParams["font.family"] = [
+# 尝试显式加载中文字体，优先使用已安装的 Noto CJK
+FONT_CANDIDATES = [
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf",
+    "/usr/share/fonts/truetype/arphic/ukai.ttc",
+]
+
+loaded_font = None
+for path in FONT_CANDIDATES:
+    p = Path(path)
+    if p.exists():
+        try:
+            font_manager.fontManager.addfont(str(p))
+            loaded_font = p
+            break
+        except Exception:
+            continue
+
+# 指定中文字体优先级，若未成功加载则回退
+font_family = []
+if loaded_font:
+    # 使用文件名作为 family（matplotlib 会注册）
+    font_family.append(loaded_font.stem)
+font_family += [
     "Noto Sans CJK SC",
     "Noto Sans SC",
     "Noto Sans",
     "SimHei",
     "DejaVu Sans",
 ]
+
+plt.rcParams["font.family"] = font_family
 plt.rcParams["axes.unicode_minus"] = False
 
 DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "disk", "route"]
