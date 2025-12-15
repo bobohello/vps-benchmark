@@ -77,13 +77,18 @@ def pctl(values, pct):
         return values[f]
     return values[f] + (values[c] - values[f]) * (k - f)
 
+def to_float(val):
+    import re
+    m = re.search(r"[-+]?\d*\.?\d+", val or "")
+    return float(m.group()) if m else 0.0
+
 for row in row_args:
     host, avg, min_, max_, mdev, loss = row.split(",")
-    avg = float(avg or 0)
-    min_ = float(min_ or 0)
-    max_ = float(max_ or 0)
-    mdev = float(mdev or 0)
-    loss = float(loss or 0)
+    avg = to_float(avg)
+    min_ = to_float(min_)
+    max_ = to_float(max_)
+    mdev = to_float(mdev)
+    loss = to_float(loss)
 
     targets.append(
         {
