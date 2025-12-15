@@ -83,9 +83,20 @@ def build_radar(scores: dict, output: Path) -> None:
     ax.set_yticklabels(["20", "40", "60", "80"])
     ax.grid(True, linestyle="--", alpha=0.3)
 
-    # 标注各维度得分
+    # 标注各维度得分，得分很高时略向内缩，避免与标题重叠
     for angle, score, label in zip(angles[:-1], dims_raw, DIMENSIONS):
-        ax.text(angle, score + 5, f"{score:.0f}", ha="center", va="center", fontsize=9, color="#111827")
+        radius = score
+        if score >= 95:
+            radius = score - 8  # 向内缩一点
+        ax.text(
+            angle,
+            radius,
+            f"{score:.0f}",
+            ha="center",
+            va="center",
+            fontsize=9,
+            color="#111827",
+        )
 
     plt.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
