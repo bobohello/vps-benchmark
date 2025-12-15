@@ -55,12 +55,12 @@ plt.rcParams["axes.unicode_minus"] = False
 
 DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "disk", "route"]
 LABELS = {
-    "latency": "延迟",
-    "stability": "稳定性",
-    "bandwidth": "带宽",
+    "latency": "Latency",
+    "stability": "Stability",
+    "bandwidth": "Bandwidth",
     "cpu": "CPU",
-    "disk": "磁盘",
-    "route": "路由",
+    "disk": "Disk",
+    "route": "Route",
 }
 
 
