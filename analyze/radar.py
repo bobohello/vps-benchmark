@@ -65,9 +65,9 @@ LABELS = {
 
 
 def build_radar(scores: dict, output: Path) -> None:
-    dims = [scores.get("dimensions", {}).get(dim, 0) for dim in DIMENSIONS]
+    dims_raw = [scores.get("dimensions", {}).get(dim, 0) for dim in DIMENSIONS]
+    dims = dims_raw + dims_raw[:1]
     angles = [n / float(len(DIMENSIONS)) * 2 * pi for n in range(len(DIMENSIONS))]
-    dims += dims[:1]
     angles += angles[:1]
 
     plt.figure(figsize=(6, 6))
@@ -79,8 +79,14 @@ def build_radar(scores: dict, output: Path) -> None:
     ax.set_xticklabels([LABELS[d] for d in DIMENSIONS])
     ax.plot(angles, dims, linewidth=2, color="#2563eb")
     ax.fill(angles, dims, color="#93c5fd", alpha=0.4)
-    ax.set_yticklabels([])
+    ax.set_yticks([20, 40, 60, 80])
+    ax.set_yticklabels(["20", "40", "60", "80"])
     ax.grid(True, linestyle="--", alpha=0.3)
+
+    # 标注各维度得分
+    for angle, score, label in zip(angles[:-1], dims_raw, DIMENSIONS):
+        ax.text(angle, score + 5, f"{score:.0f}", ha="center", va="center", fontsize=9, color="#111827")
+
     plt.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output, dpi=180)

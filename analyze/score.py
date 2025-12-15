@@ -9,6 +9,7 @@ from pathlib import Path
 
 BEST = {
     "latency_ms": 10,
+    "jitter_ms": 2,
     "packet_loss_pct": 0.5,
     "bandwidth_mbps": 1000,
     "cpu_bench": 20000,
@@ -66,9 +67,13 @@ def calc_scores(raw: dict) -> dict:
     disk = sysinfo.get("disk", {})
     cpu = sysinfo.get("cpu", {})
 
+    jitter_score = normalize(net.get("jitter_ms"), BEST["jitter_ms"], False)
+    loss_score = normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False)
+    stability = 0.6 * jitter_score + 0.4 * loss_score
+
     dimensions = {
         "latency": normalize(net.get("latency_ms"), BEST["latency_ms"], False),
-        "stability": normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False),
+        "stability": stability,
         "bandwidth": normalize(net.get("bandwidth_mbps"), BEST["bandwidth_mbps"], True),
         "cpu": normalize(cpu.get("bench_score"), BEST["cpu_bench"], True),
         "disk": normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True),
@@ -87,7 +92,7 @@ def calc_scores(raw: dict) -> dict:
         "profiles": profiles,
         "meta": {
             "generated_at": datetime.utcnow().isoformat() + "Z",
-            "model": "v0.1",
+            "model": "v0.2",
         },
     }
 
