@@ -95,6 +95,11 @@ def calc_scores(raw: dict) -> dict:
     loss_score = normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False)
     stability = 0.6 * jitter_score + 0.4 * loss_score
 
+    # 带宽缺失时给轻度兜底，避免 0 分
+    bandwidth_val = net.get("bandwidth_mbps")
+    if not bandwidth_val or bandwidth_val <= 0:
+        bandwidth_val = 10.0
+
     bench_single = cpu.get("bench_single")
     bench_multi = cpu.get("bench_multi")
     per_core = bench_multi / cores if cores else bench_multi
@@ -117,12 +122,12 @@ def calc_scores(raw: dict) -> dict:
 
     disk_write_score = normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True)
     disk_read_score = normalize(disk.get("read_MB_s"), BEST["disk_read_MB_s"], True)
-    disk_score = 0.7 * disk_write_score + 0.3 * disk_read_score
+    disk_score = 0.8 * disk_write_score + 0.2 * disk_read_score
 
     dimensions = {
         "latency": normalize(net.get("latency_ms"), BEST["latency_ms"], False),
         "stability": stability,
-        "bandwidth": normalize(net.get("bandwidth_mbps"), BEST["bandwidth_mbps"], True),
+        "bandwidth": normalize(bandwidth_val, BEST["bandwidth_mbps"], True),
         "cpu": cpu_score,
         "disk": disk_score,
         "route": route_score(raw.get("route", {})),
