@@ -54,8 +54,8 @@ disk_read() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
   if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
-    # 读取并丢弃，避免缓存影响加 iflag=direct，提升样本体积
-    if LANG=C dd if="$tmp" of=/dev/null bs=1M count=32 iflag=direct 2>/tmp/ddlog_read.$$; then
+    # 使用缓存读取（更贴近应用场景），增加样本体积
+    if LANG=C dd if="$tmp" of=/dev/null bs=1M count=64 2>/tmp/ddlog_read.$$; then
       awk '/copied/ {print $(NF-1)}' /tmp/ddlog_read.$$
     else
       echo 0

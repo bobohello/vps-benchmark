@@ -17,7 +17,7 @@ BEST = {
     "cpu_multi_total": 150000,
     "cpu_multi_per_core": 8000,
     "disk_write_MB_s": 800,
-    "disk_read_MB_s": 800,
+    "disk_read_MB_s": 600,
 }
 
 PROFILE_WEIGHTS = {
@@ -100,9 +100,9 @@ def calc_scores(raw: dict) -> dict:
     per_core = bench_multi / cores if cores else bench_multi
 
     # 如果使用估算或异常低值，做温和兜底，避免极端低分
-    if cpu_source != "sysbench" or (bench_single and bench_single < 1500):
-        bench_single = max(bench_single, cores * 1200 if cores else 2000)
-        bench_multi = max(bench_multi, cores * 5000 if cores else bench_multi)
+    if (cpu_source != "sysbench" or (bench_single and bench_single < 3000)):
+        bench_single = max(bench_single, cores * 8000 if cores else 8000)
+        bench_multi = max(bench_multi, cores * 30000 if cores else bench_multi)
         per_core = bench_multi / cores if cores else bench_multi
 
     cpu_single_score = normalize(bench_single, BEST["cpu_single"], True)
@@ -117,7 +117,7 @@ def calc_scores(raw: dict) -> dict:
 
     disk_write_score = normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True)
     disk_read_score = normalize(disk.get("read_MB_s"), BEST["disk_read_MB_s"], True)
-    disk_score = 0.5 * disk_write_score + 0.5 * disk_read_score
+    disk_score = 0.7 * disk_write_score + 0.3 * disk_read_score
 
     dimensions = {
         "latency": normalize(net.get("latency_ms"), BEST["latency_ms"], False),
