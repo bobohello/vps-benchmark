@@ -12,10 +12,12 @@ BEST = {
     "jitter_ms": 2,
     "packet_loss_pct": 0.5,
     "bandwidth_mbps": 1000,
-    "cpu_single": 3000,
-    "cpu_multi": 20000,
-    "disk_write_MB_s": 500,
-    "disk_read_MB_s": 500,
+    # CPU 参考值：单线程 / 多线程总吞吐 / 多线程人均（调高避免轻易满分）
+    "cpu_single": 8000,
+    "cpu_multi_total": 150000,
+    "cpu_multi_per_core": 8000,
+    "disk_write_MB_s": 800,
+    "disk_read_MB_s": 800,
 }
 
 PROFILE_WEIGHTS = {
@@ -43,12 +45,30 @@ PROFILE_WEIGHTS = {
 }
 
 
-def normalize(value: float, best: float, higher_is_better: bool) -> float:
+def normalize(value: float, best: float, higher_is_better: bool, headroom: float = 1.5) -> float:
+    """
+    0~100 归一化，增加 headroom 防止高分一律顶格。
+    - higher_is_better: 越大越好（带宽、CPU、IO）
+    - headroom: 超出 best 的缓冲倍数，在 best~best*headroom 之间平滑到 100
+    """
     if value is None or value <= 0 or best <= 0:
         return 0.0
+
     if higher_is_better:
-        return min(100.0, value / best * 100.0)
-    return max(0.0, min(100.0, best / value * 100.0))
+        if value <= best:
+            return min(90.0, value / best * 90.0)
+        ceiling = best * headroom
+        extra = (value - best) / max(1e-9, ceiling - best)
+        return min(100.0, 90.0 + extra * 10.0)
+    # 越小越好
+    if value >= best:
+        # 若表现不如 best，用 0~90 线性
+        factor = max(0.0, min(1.0, best / value))
+        return factor * 90.0
+    # 优于 best，平滑到 100
+    floor = max(1e-9, best / headroom)
+    extra = (best - value) / max(1e-9, best - floor)
+    return min(100.0, 90.0 + extra * 10.0)
 
 
 def route_score(route: dict) -> float:
@@ -68,14 +88,25 @@ def calc_scores(raw: dict) -> dict:
     sysinfo = raw.get("system", {})
     disk = sysinfo.get("disk", {})
     cpu = sysinfo.get("cpu", {})
+    cores = cpu.get("cores") or 0
 
     jitter_score = normalize(net.get("jitter_ms"), BEST["jitter_ms"], False)
     loss_score = normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False)
     stability = 0.6 * jitter_score + 0.4 * loss_score
 
-    cpu_single_score = normalize(cpu.get("bench_single"), BEST["cpu_single"], True)
-    cpu_multi_score = normalize(cpu.get("bench_multi"), BEST["cpu_multi"], True)
-    cpu_score = 0.4 * cpu_single_score + 0.6 * cpu_multi_score
+    bench_single = cpu.get("bench_single")
+    bench_multi = cpu.get("bench_multi")
+    per_core = bench_multi / cores if cores else bench_multi
+
+    cpu_single_score = normalize(bench_single, BEST["cpu_single"], True)
+    cpu_multi_total_score = normalize(bench_multi, BEST["cpu_multi_total"], True)
+    cpu_multi_per_core_score = normalize(per_core, BEST["cpu_multi_per_core"], True)
+    # 综合：更强调单线程与每核表现，兼顾总吞吐
+    cpu_score = (
+        0.5 * cpu_single_score
+        + 0.3 * cpu_multi_per_core_score
+        + 0.2 * cpu_multi_total_score
+    )
 
     disk_write_score = normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True)
     disk_read_score = normalize(disk.get("read_MB_s"), BEST["disk_read_MB_s"], True)
