@@ -12,8 +12,10 @@ BEST = {
     "jitter_ms": 2,
     "packet_loss_pct": 0.5,
     "bandwidth_mbps": 1000,
-    "cpu_bench": 20000,
+    "cpu_single": 3000,
+    "cpu_multi": 20000,
     "disk_write_MB_s": 500,
+    "disk_read_MB_s": 500,
 }
 
 PROFILE_WEIGHTS = {
@@ -71,12 +73,20 @@ def calc_scores(raw: dict) -> dict:
     loss_score = normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False)
     stability = 0.6 * jitter_score + 0.4 * loss_score
 
+    cpu_single_score = normalize(cpu.get("bench_single"), BEST["cpu_single"], True)
+    cpu_multi_score = normalize(cpu.get("bench_multi"), BEST["cpu_multi"], True)
+    cpu_score = 0.4 * cpu_single_score + 0.6 * cpu_multi_score
+
+    disk_write_score = normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True)
+    disk_read_score = normalize(disk.get("read_MB_s"), BEST["disk_read_MB_s"], True)
+    disk_score = 0.5 * disk_write_score + 0.5 * disk_read_score
+
     dimensions = {
         "latency": normalize(net.get("latency_ms"), BEST["latency_ms"], False),
         "stability": stability,
         "bandwidth": normalize(net.get("bandwidth_mbps"), BEST["bandwidth_mbps"], True),
-        "cpu": normalize(cpu.get("bench_score"), BEST["cpu_bench"], True),
-        "disk": normalize(disk.get("write_MB_s"), BEST["disk_write_MB_s"], True),
+        "cpu": cpu_score,
+        "disk": disk_score,
         "route": route_score(raw.get("route", {})),
     }
 
@@ -92,7 +102,7 @@ def calc_scores(raw: dict) -> dict:
         "profiles": profiles,
         "meta": {
             "generated_at": datetime.utcnow().isoformat() + "Z",
-            "model": "v0.2",
+            "model": "v0.3",
         },
     }
 

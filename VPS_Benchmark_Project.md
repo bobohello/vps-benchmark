@@ -13,7 +13,7 @@ VPS Benchmark 是一套 **自动化、可复现、可对比** 的 VPS 测评框�
 - 一键运行（curl | bash）
 - 统一评分体系
 - 多 VPS 横向对比
-- HTML 报告 + 雷达图可视化
+- HTML 报告 + 雷达图可视化（标签已改为英文：Latency / Stability / Bandwidth / CPU / Disk / Route）
 - 适合开源与长期运营
 - 模块化采集 & 分析，可扩展更多维度
 
@@ -63,6 +63,35 @@ cd vps-benchmark
 - 视频观众
 - VPS 用户复现测试
 
+### 依赖与快速跑通（在新 VPS 上）
+Debian/Ubuntu：
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip curl git iputils-ping traceroute
+# 任选其一安装带宽测速：
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash && sudo apt install -y speedtest
+# 或：sudo apt install -y speedtest-cli
+git clone https://github.com/bobohello/vps-benchmark.git
+cd vps-benchmark
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# 若使用官方 speedtest，首次需接受许可
+speedtest --accept-license --accept-gdpr -f json | head
+bash run.sh vps-$(hostname)
+```
+CentOS/RHEL：将 `apt` 换成 `yum/dnf`，并按需安装 speedtest / speedtest-cli。
+
+环境变量（可选）：
+- `PING_TARGETS`：多目标 ping，默认 `"1.1.1.1 8.8.8.8"`
+- `PING_COUNT`：每目标 ping 次数，默认 6
+- `ROUTE_TARGET`：traceroute 目标，默认 1.1.1.1
+
+清理：
+```bash
+rm -rf ~/vps-benchmark ~/.cache/matplotlib
+```
+如需卸载 speedtest：`sudo apt remove -y speedtest speedtest-cli`（或对应包管理命令）。
+
 ---
 
 ## 测评维度设计
@@ -91,6 +120,12 @@ score = min(100, value / best * 100)
 ```
 
 统一输出 0–100 分，便于横向对比。
+
+CPU / 磁盘评分依据（v0.3）：
+- CPU：单线程与多线程各测一次 `sysbench cpu --cpu-max-prime=2000`；无 sysbench 时回退核心数估算。评分 = 40% 单线程 + 60% 多线程；最佳值 single 3000、multi 20000。
+- 磁盘：顺序写（dd 16MB fsync）+ 顺序读（复用文件）；评分 = 50% 写 + 50% 读，最佳值 500 MB/s。
+
+网络稳定性：由 jitter（ping mdev）与丢包加权；带宽依赖 speedtest/speedtest-cli，未安装则为 0。
 
 ---
 

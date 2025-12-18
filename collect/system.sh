@@ -15,16 +15,26 @@ disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
 disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
 disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
-# CPU 粗略分值（若无 sysbench 则按核心数估算）
-cpu_bench() {
+# CPU 基准（若无 sysbench 则按核心数估算）
+cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
-    sysbench cpu --cpu-max-prime=2000 run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
+    sysbench cpu --cpu-max-prime=2000 --threads=1 run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
+  else
+    # 粗略估算单核
+    echo 1000
+  fi
+}
+
+cpu_bench_multi() {
+  local threads="${cpu_cores:-1}"
+  if command -v sysbench >/dev/null 2>&1; then
+    sysbench cpu --cpu-max-prime=2000 --threads="${threads}" run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
   else
     echo $((cpu_cores * 1000))
   fi
 }
 
-# 简单写入测试（小样本，避免对磁盘产生较大压力）
+# 顺序写入测试（小样本，避免过大压力）
 disk_write() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
@@ -36,15 +46,35 @@ disk_write() {
   rm -f "$tmp" /tmp/ddlog.$$ 2>/dev/null || true
 }
 
-CPU_SCORE="$(cpu_bench)"
+# 顺序读取测试（复用写入文件，避免额外 I/O）
+disk_read() {
+  local tmp
+  tmp="$(mktemp /tmp/vps-bench.XXXX)"
+  if dd if=/dev/zero of="$tmp" bs=1M count=16 conv=fsync 2>/tmp/ddlog.$$; then
+    # 读取并丢弃
+    if dd if="$tmp" of=/dev/null bs=1M 2>/tmp/ddlog_read.$$; then
+      awk '/copied/ {print $(NF-1)}' /tmp/ddlog_read.$$
+    else
+      echo 0
+    fi
+  else
+    echo 0
+  fi
+  rm -f "$tmp" /tmp/ddlog.$$ /tmp/ddlog_read.$$ 2>/dev/null || true
+}
+
+CPU_SINGLE="$(cpu_bench_single)"
+CPU_MULTI="$(cpu_bench_multi)"
 DISK_WRITE_MB_S="$(disk_write)"
+DISK_READ_MB_S="$(disk_read)"
 
 cat <<EOF
 {
   "cpu": {
     "model": $(json_escape "${cpu_model:-unknown}"),
     "cores": ${cpu_cores:-0},
-    "bench_score": ${CPU_SCORE:-0}
+    "bench_single": ${CPU_SINGLE:-0},
+    "bench_multi": ${CPU_MULTI:-0}
   },
   "memory": {
     "total_kb": ${mem_total_kb:-0},
@@ -53,7 +83,8 @@ cat <<EOF
   "disk": {
     "total_bytes": ${disk_total_bytes:-0},
     "used_bytes": ${disk_used_bytes:-0},
-    "write_MB_s": ${DISK_WRITE_MB_S:-0}
+    "write_MB_s": ${DISK_WRITE_MB_S:-0},
+    "read_MB_s": ${DISK_READ_MB_S:-0}
   }
 }
 EOF
