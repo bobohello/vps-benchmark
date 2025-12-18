@@ -146,6 +146,17 @@ def calc_scores(raw: dict) -> dict:
         "meta": {
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "model": "v0.3",
+            "cpu_info": {
+                "model": cpu.get("model"),
+                "cores": cores,
+                "bench_single": bench_single,
+                "bench_multi": bench_multi,
+                "source": cpu_source,
+            },
+            "disk_info": {
+                "write_MB_s": disk.get("write_MB_s"),
+                "read_MB_s": disk.get("read_MB_s"),
+            },
         },
     }
 

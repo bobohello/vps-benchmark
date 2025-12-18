@@ -98,6 +98,25 @@ def build_radar(scores: dict, output: Path) -> None:
             color="#111827",
         )
 
+    # 可选：在图下方展示 CPU/Disk 采集信息
+    meta = scores.get("meta", {})
+    cpu_info = meta.get("cpu_info") or {}
+    disk_info = meta.get("disk_info") or {}
+    info_lines = []
+    if cpu_info:
+        model = cpu_info.get("model", "CPU")
+        single = cpu_info.get("bench_single", 0)
+        multi = cpu_info.get("bench_multi", 0)
+        source = cpu_info.get("source", "unknown")
+        info_lines.append(f"CPU: {model}")
+        info_lines.append(f"  single={single}, multi={multi}, src={source}")
+    if disk_info:
+        w = disk_info.get("write_MB_s", 0)
+        r = disk_info.get("read_MB_s", 0)
+        info_lines.append(f"Disk: write={w} MB/s, read={r} MB/s")
+    if info_lines:
+        plt.gcf().text(0.02, 0.02, "\n".join(info_lines), ha="left", va="bottom", fontsize=8, color="#111827")
+
     plt.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output, dpi=180)
