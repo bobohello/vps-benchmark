@@ -121,9 +121,9 @@ score = min(100, value / best * 100)
 
 统一输出 0–100 分，便于横向对比。
 
-CPU / 磁盘评分依据（v0.3）：
-- CPU：单线程与多线程各测一次 `sysbench cpu --cpu-max-prime=2000`；无 sysbench 时回退核心数估算。评分 = 40% 单线程 + 60% 多线程；最佳值 single 3000、multi 20000。
-- 磁盘：顺序写（dd 16MB fsync）+ 顺序读（复用文件）；评分 = 50% 写 + 50% 读，最佳值 500 MB/s。
+CPU / 磁盘评分依据（v0.3+ 调整）：
+- CPU：单线程与多线程各测一次 `sysbench cpu --cpu-max-prime=2000`；无 sysbench 时回退估算并标注来源。评分 = 50% 单线程 + 30% 多线程人均 + 20% 多线程总吞吐；参考值 single 8000、multi_total 150000、multi_per_core 8000，带 headroom 平滑，估算时做温和兜底避免极低分。
+- 磁盘：顺序写（dd 32MB fsync）+ 顺序读（同文件 iflag=direct）；评分 = 50% 写 + 50% 读，参考值 800 MB/s，带平滑。
 
 网络稳定性：由 jitter（ping mdev）与丢包加权；带宽依赖 speedtest/speedtest-cli，未安装则为 0。
 

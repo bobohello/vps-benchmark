@@ -15,13 +15,15 @@ disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
 disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
 disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
-# CPU 基准（若无 sysbench 则按核心数估算）
+# CPU 基准（若无 sysbench 则回退估算，并标注来源）
+cpu_bench_source="sysbench"
+
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
     sysbench cpu --cpu-max-prime=2000 --threads=1 run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
   else
-    # 粗略估算单核
-    echo 1000
+    cpu_bench_source="estimate"
+    echo 2000
   fi
 }
 
@@ -30,7 +32,8 @@ cpu_bench_multi() {
   if command -v sysbench >/dev/null 2>&1; then
     sysbench cpu --cpu-max-prime=2000 --threads="${threads}" run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
   else
-    echo $((cpu_cores * 1000))
+    cpu_bench_source="estimate"
+    echo $((cpu_cores * 4000))
   fi
 }
 
@@ -38,7 +41,7 @@ cpu_bench_multi() {
 disk_write() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
-  if dd if=/dev/zero of="$tmp" bs=1M count=16 conv=fsync 2>/tmp/ddlog.$$; then
+  if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
     awk '/copied/ {print $(NF-1)}' /tmp/ddlog.$$
   else
     echo 0
@@ -50,9 +53,9 @@ disk_write() {
 disk_read() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
-  if dd if=/dev/zero of="$tmp" bs=1M count=16 conv=fsync 2>/tmp/ddlog.$$; then
-    # 读取并丢弃
-    if dd if="$tmp" of=/dev/null bs=1M 2>/tmp/ddlog_read.$$; then
+  if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
+    # 读取并丢弃，避免缓存影响加 iflag=direct，提升样本体积
+    if LANG=C dd if="$tmp" of=/dev/null bs=1M count=32 iflag=direct 2>/tmp/ddlog_read.$$; then
       awk '/copied/ {print $(NF-1)}' /tmp/ddlog_read.$$
     else
       echo 0
@@ -74,7 +77,8 @@ cat <<EOF
     "model": $(json_escape "${cpu_model:-unknown}"),
     "cores": ${cpu_cores:-0},
     "bench_single": ${CPU_SINGLE:-0},
-    "bench_multi": ${CPU_MULTI:-0}
+    "bench_multi": ${CPU_MULTI:-0},
+    "bench_source": $(json_escape "${cpu_bench_source}")
   },
   "memory": {
     "total_kb": ${mem_total_kb:-0},

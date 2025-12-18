@@ -89,6 +89,7 @@ def calc_scores(raw: dict) -> dict:
     disk = sysinfo.get("disk", {})
     cpu = sysinfo.get("cpu", {})
     cores = cpu.get("cores") or 0
+    cpu_source = cpu.get("bench_source") or "unknown"
 
     jitter_score = normalize(net.get("jitter_ms"), BEST["jitter_ms"], False)
     loss_score = normalize(net.get("packet_loss_pct"), BEST["packet_loss_pct"], False)
@@ -97,6 +98,12 @@ def calc_scores(raw: dict) -> dict:
     bench_single = cpu.get("bench_single")
     bench_multi = cpu.get("bench_multi")
     per_core = bench_multi / cores if cores else bench_multi
+
+    # 如果使用估算或异常低值，做温和兜底，避免极端低分
+    if cpu_source != "sysbench" or (bench_single and bench_single < 1500):
+        bench_single = max(bench_single, cores * 1200 if cores else 2000)
+        bench_multi = max(bench_multi, cores * 5000 if cores else bench_multi)
+        per_core = bench_multi / cores if cores else bench_multi
 
     cpu_single_score = normalize(bench_single, BEST["cpu_single"], True)
     cpu_multi_total_score = normalize(bench_multi, BEST["cpu_multi_total"], True)
