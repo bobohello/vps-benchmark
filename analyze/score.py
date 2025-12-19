@@ -100,15 +100,18 @@ def calc_scores(raw: dict) -> dict:
     if not bandwidth_val or bandwidth_val <= 0:
         bandwidth_val = 10.0
 
-    bench_single = cpu.get("bench_single")
-    bench_multi = cpu.get("bench_multi")
+    bench_single = cpu.get("bench_single") or 0
+    bench_multi = cpu.get("bench_multi") or 0
+    
+    # 只在真正使用估算值时才做兜底处理，保留sysbench的真实结果
+    if cpu_source != "sysbench":
+        # 仅当使用估算值（非sysbench）时，才给一个合理的兜底值
+        if not bench_single or bench_single <= 0:
+            bench_single = cores * 2000 if cores else 2000
+        if not bench_multi or bench_multi <= 0:
+            bench_multi = cores * 4000 if cores else 4000
+    
     per_core = bench_multi / cores if cores else bench_multi
-
-    # 如果使用估算或异常低值，做温和兜底，避免极端低分
-    if (cpu_source != "sysbench" or (bench_single and bench_single < 3000)):
-        bench_single = max(bench_single, cores * 8000 if cores else 8000)
-        bench_multi = max(bench_multi, cores * 30000 if cores else bench_multi)
-        per_core = bench_multi / cores if cores else bench_multi
 
     cpu_single_score = normalize(bench_single, BEST["cpu_single"], True)
     cpu_multi_total_score = normalize(bench_multi, BEST["cpu_multi_total"], True)

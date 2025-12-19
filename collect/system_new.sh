@@ -73,8 +73,18 @@ PY
       echo "$val"
     fi
   else
-    cpu_bench_source="estimate"
-    echo 2000
+    cpu_bench_source="estimate-fallback"
+    # 使用更智能的估算：基于bogomips，如果没有则给保守值
+    if [ -n "$cpu_bogomips" ] && [ "$(printf '%.0f' "$cpu_bogomips" 2>/dev/null || echo 0)" -gt 0 ]; then
+      python3 - <<PY "$cpu_bogomips"
+import sys
+b = float(sys.argv[1]) if sys.argv[1] else 1.0
+# bogomips 通常在 4000-8000 范围，转换为 events/s 大约是 bogomips * 0.5
+print(f"{b*0.5:.2f}")
+PY
+    else
+      echo 2000
+    fi
   fi
 }
 
@@ -95,8 +105,19 @@ PY
       echo "$val"
     fi
   else
-    cpu_bench_source="estimate"
-    echo $((threads * 4000))
+    cpu_bench_source="estimate-fallback"
+    # 使用更智能的估算：基于bogomips和核心数
+    if [ -n "$cpu_bogomips" ] && [ "$(printf '%.0f' "$cpu_bogomips" 2>/dev/null || echo 0)" -gt 0 ]; then
+      python3 - <<PY "$cpu_bogomips" "$threads"
+import sys
+b = float(sys.argv[1]) if sys.argv[1] else 1.0
+c = float(sys.argv[2]) if sys.argv[2] else 1.0
+# 多核性能通常不是线性扩展，使用 0.85 的扩展系数
+print(f"{b*0.5*c*0.85:.2f}")
+PY
+    else
+      echo $((threads * 4000))
+    fi
   fi
 }
 
