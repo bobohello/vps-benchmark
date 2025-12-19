@@ -18,12 +18,39 @@ disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 # CPU 基准（若无 sysbench 则回退估算，并标注来源）
 cpu_bench_source="sysbench"
 
+cpu_bench_parse() {
+  # 从 sysbench 输出中解析 events/s，若未直接给出则用 total events / total time
+  python3 - "$@" <<'PY'
+import sys, re
+text = sys.stdin.read()
+eps = None
+for line in text.splitlines():
+    if "events per second" in line:
+        m = re.search(r"events per second:\s*([0-9.+-eE]+)", line)
+        if m:
+            eps = float(m.group(1))
+            break
+if eps is None:
+    events = None
+    t = None
+    m1 = re.search(r"total number of events:\s*([0-9.+-eE]+)", text)
+    m2 = re.search(r"total time:\s*([0-9.+-eE]+)s", text)
+    if m1:
+        events = float(m1.group(1))
+    if m2:
+        t = float(m2.group(1))
+    if events is not None and t and t > 0:
+        eps = events / t
+print(f"{eps:.2f}" if eps is not None else "0")
+PY
+}
+
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
-    local prime="${SYSBENCH_PRIME:-20000}"
-    local duration="${SYSBENCH_TIME:-5}"
+    local prime="${SYSBENCH_PRIME:-40000}"
+    local duration="${SYSBENCH_TIME:-8}"
     sysbench cpu --cpu-max-prime="${prime}" --threads=1 --time="${duration}" --events=0 run 2>/dev/null \
-      | awk '/events per second/ {print $4}' | tail -n1
+      | cpu_bench_parse
   else
     cpu_bench_source="estimate"
     echo 2000
@@ -33,10 +60,10 @@ cpu_bench_single() {
 cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
-    local prime="${SYSBENCH_PRIME:-20000}"
-    local duration="${SYSBENCH_TIME:-5}"
+    local prime="${SYSBENCH_PRIME:-40000}"
+    local duration="${SYSBENCH_TIME:-8}"
     sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null \
-      | awk '/events per second/ {print $4}' | tail -n1
+      | cpu_bench_parse
   else
     cpu_bench_source="estimate"
     echo $((cpu_cores * 4000))
