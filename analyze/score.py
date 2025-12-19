@@ -12,10 +12,11 @@ BEST = {
     "jitter_ms": 2,
     "packet_loss_pct": 0.5,
     "bandwidth_mbps": 1000,
-    # CPU 参考值：单线程 / 多线程总吞吐 / 多线程人均（调高避免轻易满分）
-    "cpu_single": 8000,
-    "cpu_multi_total": 150000,
-    "cpu_multi_per_core": 8000,
+    # CPU 参考值：基于 sysbench cpu prime=80000 的真实测试结果
+    # 高端服务器CPU（如 AMD EPYC 9654/Intel Xeon Platinum）单核约 150-200 events/s
+    "cpu_single": 200,
+    "cpu_multi_total": 3200,  # 32核高性能CPU的多核总吞吐（约100 events/s per core）
+    "cpu_multi_per_core": 150,  # 每核的优秀性能
     "disk_write_MB_s": 800,
     "disk_read_MB_s": 600,
 }
