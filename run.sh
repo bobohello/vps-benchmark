@@ -15,7 +15,7 @@ log() {
 run_collect() {
   log "开始数据采集 -> ${OUT_DIR}"
   set +e +u +o pipefail
-  bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json"
+  bash "${ROOT_DIR}/collect/system_new.sh" >"${OUT_DIR}/system.json"
   sys_status=$?
   bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json"
   net_status=$?
