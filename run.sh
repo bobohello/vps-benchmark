@@ -14,13 +14,28 @@ log() {
 
 run_collect() {
   log "开始数据采集 -> ${OUT_DIR}"
-  if ! bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json"; then
+  set +e +u +o pipefail
+  bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json"
+  sys_status=$?
+  bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json"
+  net_status=$?
+  bash "${ROOT_DIR}/collect/route.sh" >"${OUT_DIR}/route.json"
+  route_status=$?
+  set -euo pipefail
+
+  if [ $sys_status -ne 0 ]; then
     log "system.sh failed"
     cat "${OUT_DIR}/system.json" 2>/dev/null || true
     exit 1
   fi
-  bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json" || { log "network.sh failed"; exit 1; }
-  bash "${ROOT_DIR}/collect/route.sh" >"${OUT_DIR}/route.json" || { log "route.sh failed"; exit 1; }
+  if [ $net_status -ne 0 ]; then
+    log "network.sh failed"
+    exit 1
+  fi
+  if [ $route_status -ne 0 ]; then
+    log "route.sh failed"
+    exit 1
+  fi
 
   python3 - <<'PY' "${OUT_DIR}"
 import json, pathlib, sys
