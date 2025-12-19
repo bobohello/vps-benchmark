@@ -33,7 +33,7 @@ run_sysbench() {
     out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
   fi
   status=$?
-  set -e
+  set +e
   if [ $status -ne 0 ] || [ -z "$out" ]; then
     echo ""
     return 1
