@@ -23,13 +23,41 @@ SB_TIMEOUT="${SYSBENCH_TIMEOUT:-15}"
 run_sysbench() {
   # $1: threads
   local threads="$1"
-  local prime="${SYSBENCH_PRIME:-40000}"
-  local duration="${SYSBENCH_TIME:-8}"
-  local cmd=(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run)
+  local prime="${SYSBENCH_PRIME:-20000}"
+  local duration="${SYSBENCH_TIME:-5}"
+  local out status
+  set +e
   if command -v timeout >/dev/null 2>&1; then
-    cmd=(timeout "${SB_TIMEOUT}s" "${cmd[@]}")
+    out="$(timeout "${SB_TIMEOUT}s" sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
+  else
+    out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
   fi
-  "${cmd[@]}" 2>/dev/null | cpu_bench_parse
+  status=$?
+  set -e
+  if [ $status -ne 0 ] || [ -z "$out" ]; then
+    echo ""
+    return 1
+  fi
+  # 解析 events/s，若没有则用 total events / total time
+  printf '%s\n' "$out" | python3 - <<'PY'
+import sys, re
+text = sys.stdin.read()
+eps = None
+for line in text.splitlines():
+    if "events per second" in line:
+        m = re.search(r"events per second:\s*([0-9.+-eE]+)", line)
+        if m:
+            eps = float(m.group(1)); break
+if eps is None:
+    ev = None; tt = None
+    m1 = re.search(r"total number of events:\s*([0-9.+-eE]+)", text)
+    m2 = re.search(r"total time:\s*([0-9.+-eE]+)s", text)
+    if m1: ev = float(m1.group(1))
+    if m2: tt = float(m2.group(1))
+    if ev is not None and tt and tt > 0:
+        eps = ev / tt
+print(f"{eps:.2f}" if eps is not None else "")
+PY
 }
 
 cpu_bench_parse() {
@@ -62,7 +90,7 @@ PY
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
     local val
-    val="$(run_sysbench 1)"
+    val="$(run_sysbench 1 || true)"
     if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
       cpu_bench_source="estimate"
       echo 2000
@@ -79,7 +107,7 @@ cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
     local val
-    val="$(run_sysbench "${threads}")"
+    val="$(run_sysbench "${threads}" || true)"
     if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
       cpu_bench_source="estimate"
       echo $((cpu_cores * 4000))
