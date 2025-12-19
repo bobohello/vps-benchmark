@@ -35,9 +35,11 @@ run_sysbench() {
     echo ""
     return 1
   fi
-  printf '%s\n' "$out" | python3 - <<'PY'
+  python3 <<PY
 import sys, re
-text = sys.stdin.read()
+# 直接从日志文件读取，避免stdin冲突
+with open("/tmp/vps-bench-sysbench-${threads}.log", "r") as f:
+    text = f.read()
 eps = None
 for line in text.splitlines():
     if "events per second" in line:
