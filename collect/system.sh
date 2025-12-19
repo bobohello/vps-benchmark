@@ -6,9 +6,9 @@ set +u
 set +o pipefail
 
 json_escape() {
-  printf '%s' "$1" | python3 - <<'PY'
+  python3 - <<'PY' "$1"
 import json, sys
-print(json.dumps(sys.stdin.read()))
+print(json.dumps(sys.argv[1]))
 PY
 }
 
@@ -22,20 +22,6 @@ disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
 disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
 disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
-json_escape() {
-  printf '%s' "$1" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
-}
-
-cpu_model="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | sed 's/^ //')"
-cpu_cores="$(nproc 2>/dev/null || echo 0)"
-mem_total_kb="$(grep -m1 MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')"
-mem_free_kb="$(grep -m1 MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')"
-
-disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
-disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
-disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
-
-# CPU 基准（若无 sysbench 则回退估算，并标注来源）
 cpu_bench_source="sysbench"
 
 run_sysbench() {
@@ -43,12 +29,9 @@ run_sysbench() {
   local prime="${SYSBENCH_PRIME:-20000}"
   local duration="${SYSBENCH_TIME:-5}"
   local out status
-  if command -v timeout >/dev/null 2>&1; then
-    out="$(timeout "${SB_TIMEOUT}s" sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
-  else
-    out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
-  fi
+  out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>&1)"
   status=$?
+  printf '%s\n' "$out" >"/tmp/vps-bench-sysbench-${threads}.log"
   if [ $status -ne 0 ] || [ -z "$out" ]; then
     echo ""
     return 1
@@ -72,33 +55,6 @@ if eps is None:
     if ev is not None and tt and tt > 0:
         eps = ev / tt
 print(f"{eps:.2f}" if eps is not None else "")
-PY
-}
-
-cpu_bench_parse() {
-  # 从 sysbench 输出中解析 events/s，若未直接给出则用 total events / total time
-  python3 - "$@" <<'PY'
-import sys, re
-text = sys.stdin.read()
-eps = None
-for line in text.splitlines():
-    if "events per second" in line:
-        m = re.search(r"events per second:\s*([0-9.+-eE]+)", line)
-        if m:
-            eps = float(m.group(1))
-            break
-if eps is None:
-    events = None
-    t = None
-    m1 = re.search(r"total number of events:\s*([0-9.+-eE]+)", text)
-    m2 = re.search(r"total time:\s*([0-9.+-eE]+)s", text)
-    if m1:
-        events = float(m1.group(1))
-    if m2:
-        t = float(m2.group(1))
-    if events is not None and t and t > 0:
-        eps = events / t
-print(f"{eps:.2f}" if eps is not None else "0")
 PY
 }
 
@@ -142,7 +98,6 @@ PY
   fi
 }
 
-# 顺序写入测试（小样本，避免过大压力）
 disk_write() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
@@ -154,12 +109,10 @@ disk_write() {
   rm -f "$tmp" /tmp/ddlog.$$ 2>/dev/null || true
 }
 
-# 顺序读取测试（复用写入文件，避免额外 I/O）
 disk_read() {
   local tmp
   tmp="$(mktemp /tmp/vps-bench.XXXX)"
   if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
-    # 使用缓存读取（更贴近应用场景），增加样本体积
     if LANG=C dd if="$tmp" of=/dev/null bs=1M count=64 2>/tmp/ddlog_read.$$; then
       awk '/copied/ {print $(NF-1)}' /tmp/ddlog_read.$$
     else
@@ -184,7 +137,7 @@ cat <<EOF
     "bench_single": ${CPU_SINGLE:-0},
     "bench_multi": ${CPU_MULTI:-0},
     "bench_source": $(json_escape "${cpu_bench_source}"),
-    "max_mhz": ${cpu_max_mhz:-0}
+    "bogomips": ${cpu_bogomips:-0}
   },
   "memory": {
     "total_kb": ${mem_total_kb:-0},
