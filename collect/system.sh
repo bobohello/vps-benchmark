@@ -1,9 +1,26 @@
 #!/usr/bin/env bash
 # 采集系统与性能基础信息（轻量化，依赖常见命令）
-# 容忍失败，尽量输出结果（关闭 -e / -u / pipefail）
+# 完全关闭 errexit / nounset / pipefail，保证输出
 set +e
 set +u
 set +o pipefail
+
+json_escape() {
+  printf '%s' "$1" | python3 - <<'PY'
+import json, sys
+print(json.dumps(sys.stdin.read()))
+PY
+}
+
+cpu_model="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/^.*model name[ \t]*:[ \t]*//')"
+cpu_cores="$(nproc 2>/dev/null || echo 0)"
+cpu_bogomips="$(grep -m1 'bogomips' /proc/cpuinfo 2>/dev/null | awk '{print $3}')"
+mem_total_kb="$(grep -m1 MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')"
+mem_free_kb="$(grep -m1 MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')"
+
+disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
+disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
+disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
 json_escape() {
   printf '%s' "$1" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
@@ -32,24 +49,20 @@ cpu_bench_source="sysbench"
 SB_TIMEOUT="${SYSBENCH_TIMEOUT:-15}"
 
 run_sysbench() {
-  # $1: threads
   local threads="$1"
-  local prime="${SYSBENCH_PRIME:-20000}"
-  local duration="${SYSBENCH_TIME:-5}"
+  local prime="${SYSBENCH_PRIME:-15000}"
+  local duration="${SYSBENCH_TIME:-10}"
   local out status
-  set +e
   if command -v timeout >/dev/null 2>&1; then
     out="$(timeout "${SB_TIMEOUT}s" sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
   else
     out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
   fi
   status=$?
-  set +e
   if [ $status -ne 0 ] || [ -z "$out" ]; then
     echo ""
     return 1
   fi
-  # 解析 events/s，若没有则用 total events / total time
   printf '%s\n' "$out" | python3 - <<'PY'
 import sys, re
 text = sys.stdin.read()
@@ -58,7 +71,8 @@ for line in text.splitlines():
     if "events per second" in line:
         m = re.search(r"events per second:\s*([0-9.+-eE]+)", line)
         if m:
-            eps = float(m.group(1)); break
+            eps = float(m.group(1))
+            break
 if eps is None:
     ev = None; tt = None
     m1 = re.search(r"total number of events:\s*([0-9.+-eE]+)", text)
@@ -100,11 +114,14 @@ PY
 
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
-    local val
-    val="$(run_sysbench 1 || true)"
+    local val; val="$(run_sysbench 1 || true)"
     if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
-      cpu_bench_source="estimate"
-      echo 2000
+      cpu_bench_source="estimate-bogomips"
+      python3 - <<PY "$cpu_bogomips"
+import sys
+bogo = float(sys.argv[1]) if sys.argv[1] else 1.0
+print(f"{bogo*1000:.2f}")
+PY
     else
       echo "$val"
     fi
@@ -117,11 +134,15 @@ cpu_bench_single() {
 cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
-    local val
-    val="$(run_sysbench "${threads}" || true)"
+    local val; val="$(run_sysbench "${threads}" || true)"
     if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
-      cpu_bench_source="estimate"
-      echo $((cpu_cores * 4000))
+      cpu_bench_source="estimate-bogomips"
+      python3 - <<PY "$cpu_bogomips" "${cpu_cores}"
+import sys
+bogo = float(sys.argv[1]) if sys.argv[1] else 1.0
+cores = float(sys.argv[2]) if sys.argv[2] else 1.0
+print(f"{bogo*1000*cores:.2f}")
+PY
     else
       echo "$val"
     fi
