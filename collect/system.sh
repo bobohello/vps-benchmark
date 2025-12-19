@@ -35,23 +35,13 @@ disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
 disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
 disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
-# CPU 最大频率（MHz），用于区分不同处理器的 sysbench 同值情况
-cpu_max_mhz=""
-if command -v lscpu >/dev/null 2>&1; then
-  cpu_max_mhz="$(lscpu | awk -F: '/max MHz/ {gsub(/ /,""); print $2; exit}')"
-fi
-if [ -z "$cpu_max_mhz" ] && [ -f /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ]; then
-  cpu_max_mhz="$(awk '{printf "%.0f", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
-fi
-
 # CPU 基准（若无 sysbench 则回退估算，并标注来源）
 cpu_bench_source="sysbench"
-SB_TIMEOUT="${SYSBENCH_TIMEOUT:-15}"
 
 run_sysbench() {
   local threads="$1"
-  local prime="${SYSBENCH_PRIME:-15000}"
-  local duration="${SYSBENCH_TIME:-10}"
+  local prime="${SYSBENCH_PRIME:-20000}"
+  local duration="${SYSBENCH_TIME:-5}"
   local out status
   if command -v timeout >/dev/null 2>&1; then
     out="$(timeout "${SB_TIMEOUT}s" sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null)"
@@ -185,34 +175,6 @@ CPU_SINGLE="$(cpu_bench_single)"
 CPU_MULTI="$(cpu_bench_multi)"
 DISK_WRITE_MB_S="$(disk_write)"
 DISK_READ_MB_S="$(disk_read)"
-
-# 若 sysbench 输出疑似平台限制（数值相同），结合频率做缩放以拉开差异
-if [ -n "${cpu_max_mhz}" ] && echo "$cpu_max_mhz" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
-  scale=$(python3 - <<PY "$cpu_max_mhz"
-import sys
-mhz = float(sys.argv[1])
-baseline = 2500.0
-scale = mhz / baseline if baseline > 0 else 1.0
-scale = min(2.5, max(0.5, scale))
-print(f"{scale:.3f}")
-PY
-)
-  CPU_SINGLE=$(python3 - <<PY "$CPU_SINGLE" "$scale"
-import sys
-val = float(sys.argv[1]) if sys.argv[1] else 0.0
-s = float(sys.argv[2])
-print(f"{val*s:.2f}")
-PY
-)
-  CPU_MULTI=$(python3 - <<PY "$CPU_MULTI" "$scale"
-import sys
-val = float(sys.argv[1]) if sys.argv[1] else 0.0
-s = float(sys.argv[2])
-print(f"{val*s:.2f}")
-PY
-)
-  cpu_bench_source="${cpu_bench_source}+freq"
-fi
 
 cat <<EOF
 {
