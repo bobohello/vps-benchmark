@@ -20,7 +20,10 @@ cpu_bench_source="sysbench"
 
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
-    sysbench cpu --cpu-max-prime=2000 --threads=1 run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
+    local prime="${SYSBENCH_PRIME:-20000}"
+    local duration="${SYSBENCH_TIME:-5}"
+    sysbench cpu --cpu-max-prime="${prime}" --threads=1 --time="${duration}" --events=0 run 2>/dev/null \
+      | awk '/events per second/ {print $4}' | tail -n1
   else
     cpu_bench_source="estimate"
     echo 2000
@@ -30,7 +33,10 @@ cpu_bench_single() {
 cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
-    sysbench cpu --cpu-max-prime=2000 --threads="${threads}" run 2>/dev/null | awk '/events per second/ {print int($4)}' | tail -n1
+    local prime="${SYSBENCH_PRIME:-20000}"
+    local duration="${SYSBENCH_TIME:-5}"
+    sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null \
+      | awk '/events per second/ {print $4}' | tail -n1
   else
     cpu_bench_source="estimate"
     echo $((cpu_cores * 4000))
