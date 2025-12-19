@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 采集系统与性能基础信息（轻量化，依赖常见命令）
-set -euo pipefail
-trap 'echo "{\"error\":\"system.sh failed\"}"' EXIT
+# 容忍失败，尽量输出结果
+set -uo pipefail
 
 json_escape() {
   printf '%s' "$1" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
@@ -175,5 +175,4 @@ cat <<EOF
   }
 }
 EOF
-trap - EXIT
 
