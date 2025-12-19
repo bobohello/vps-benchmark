@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# 采集系统与性能基础信息（轻量化，依赖常见命令）
-# 完全关闭 errexit / nounset / pipefail，保证输出
+# 采集系统信息（CPU/内存/磁盘），关闭 errexit/nounset/pipefail，优先用 sysbench，失败兜底
 set +e
 set +u
 set +o pipefail
@@ -12,24 +11,24 @@ print(json.dumps(sys.argv[1]))
 PY
 }
 
+# 基本信息
 cpu_model="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/^.*model name[ \t]*:[ \t]*//')"
 cpu_cores="$(nproc 2>/dev/null || echo 0)"
 cpu_bogomips="$(grep -m1 'bogomips' /proc/cpuinfo 2>/dev/null | awk '{print $3}')"
-mem_total_kb="$(grep -m1 MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')"
-mem_free_kb="$(grep -m1 MemAvailable /proc/meminfo 2>/dev/null | awk '{print $2}')"
+mem_total_kb="$(awk '/MemTotal/ {print $2; exit}' /proc/meminfo)"
+mem_free_kb="$(awk '/MemAvailable/ {print $2; exit}' /proc/meminfo)"
 
-disk_line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
-disk_total_bytes="$(awk '{print $2}' <<<"${disk_line:-0}")"
-disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
+line="$(df -PB1 / 2>/dev/null | awk 'NR==2')"
+disk_total_bytes="$(awk '{print $2}' <<<"${line:-0}")"
+disk_used_bytes="$(awk '{print $3}' <<<"${line:-0}")"
 
-cpu_bench_source="sysbench"
-
+# sysbench 采集
 run_sysbench() {
   local threads="$1"
   local prime="${SYSBENCH_PRIME:-80000}"
   local duration="${SYSBENCH_TIME:-15}"
   local out status
-  out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>&1)"
+  out="$(sysbench cpu --cpu-max-prime="$prime" --threads="$threads" --time="$duration" --events=0 run 2>&1)"
   status=$?
   printf '%s\n' "$out" >"/tmp/vps-bench-sysbench-${threads}.log"
   if [ $status -ne 0 ] || [ -z "$out" ]; then
@@ -58,15 +57,17 @@ print(f"{eps:.2f}" if eps is not None else "")
 PY
 }
 
+cpu_bench_source="sysbench"
+
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
     local val; val="$(run_sysbench 1 || true)"
-    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 5000 ]; then
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
       cpu_bench_source="estimate-bogomips"
       python3 - <<PY "$cpu_bogomips"
 import sys
-bogo = float(sys.argv[1]) if sys.argv[1] else 1.0
-print(f"{bogo*1000:.2f}")
+b = float(sys.argv[1]) if sys.argv[1] else 1.0
+print(f"{b*800:.2f}")
 PY
     else
       echo "$val"
@@ -78,29 +79,30 @@ PY
 }
 
 cpu_bench_multi() {
-  local threads="${cpu_cores:-1}"
+  local threads="$cpu_cores"
+  if [ -z "$threads" ] || [ "$threads" -le 0 ] 2>/dev/null; then threads=1; fi
   if command -v sysbench >/dev/null 2>&1; then
-    local val; val="$(run_sysbench "${threads}" || true)"
-    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 30000 ]; then
+    local val; val="$(run_sysbench "$threads" || true)"
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
       cpu_bench_source="estimate-bogomips"
-      python3 - <<PY "$cpu_bogomips" "${cpu_cores}"
+      python3 - <<PY "$cpu_bogomips" "$threads"
 import sys
-bogo = float(sys.argv[1]) if sys.argv[1] else 1.0
-cores = float(sys.argv[2]) if sys.argv[2] else 1.0
-print(f"{bogo*1000*cores:.2f}")
+b = float(sys.argv[1]) if sys.argv[1] else 1.0
+c = float(sys.argv[2]) if sys.argv[2] else 1.0
+print(f"{b*800*c:.2f}")
 PY
     else
       echo "$val"
     fi
   else
     cpu_bench_source="estimate"
-    echo $((cpu_cores * 4000))
+    echo $((threads * 4000))
   fi
 }
 
+# 磁盘顺序读写（轻量）
 disk_write() {
-  local tmp
-  tmp="$(mktemp /tmp/vps-bench.XXXX)"
+  local tmp; tmp="$(mktemp /tmp/vps-bench.XXXX)"
   if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
     awk '/copied/ {print $(NF-1)}' /tmp/ddlog.$$
   else
@@ -110,8 +112,7 @@ disk_write() {
 }
 
 disk_read() {
-  local tmp
-  tmp="$(mktemp /tmp/vps-bench.XXXX)"
+  local tmp; tmp="$(mktemp /tmp/vps-bench.XXXX)"
   if LANG=C dd if=/dev/zero of="$tmp" bs=1M count=32 conv=fsync 2>/tmp/ddlog.$$; then
     if LANG=C dd if="$tmp" of=/dev/null bs=1M count=64 2>/tmp/ddlog_read.$$; then
       awk '/copied/ {print $(NF-1)}' /tmp/ddlog_read.$$
