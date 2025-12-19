@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 采集系统与性能基础信息（轻量化，依赖常见命令）
-# 容忍失败，尽量输出结果（不使用 set -e / pipefail）
+# 容忍失败，尽量输出结果（关闭 -e / -u / pipefail）
 set +e
+set +u
+set +o pipefail
 
 json_escape() {
   printf '%s' "$1" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
