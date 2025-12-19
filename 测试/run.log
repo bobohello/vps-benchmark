@@ -1,0 +1,16 @@
++ set -euo pipefail
++++ dirname run.sh
+++ cd .
+++ pwd
++ ROOT_DIR=/root/vps-benchmark
++ RUN_ID=vps-eziohxm1ikdtk40
++ OUT_DIR=/root/vps-benchmark/output/vps-eziohxm1ikdtk40
++ mkdir -p /root/vps-benchmark/output/vps-eziohxm1ikdtk40
++ log '运行 ID: vps-eziohxm1ikdtk40'
++ printf '[run] %s\n' '运行 ID: vps-eziohxm1ikdtk40'
+[run] 运行 ID: vps-eziohxm1ikdtk40
++ run_collect
++ log '开始数据采集 -> /root/vps-benchmark/output/vps-eziohxm1ikdtk40'
++ printf '[run] %s\n' '开始数据采集 -> /root/vps-benchmark/output/vps-eziohxm1ikdtk40'
+[run] 开始数据采集 -> /root/vps-benchmark/output/vps-eziohxm1ikdtk40
++ bash /root/vps-benchmark/collect/system.sh

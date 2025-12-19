@@ -1,0 +1,19 @@
+{
+  "cpu": {
+    "model": "AMD EPYC 7502 32-Core Processor",
+    "cores": 4,
+    "bench_single": 2000,
+    "bench_multi": 16000,
+    "bench_source": "sysbench"
+  },
+  "memory": {
+    "total_kb": 8144164,
+    "available_kb": 7747504
+  },
+  "disk": {
+    "total_bytes": 94900514816,
+    "used_bytes": 1885409280,
+    "write_MB_s": 471,
+    "read_MB_s": 9.0
+  }
+}
