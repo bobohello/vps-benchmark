@@ -14,9 +14,9 @@ log() {
 
 run_collect() {
   log "开始数据采集 -> ${OUT_DIR}"
-  bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json"
-  bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json"
-  bash "${ROOT_DIR}/collect/route.sh" >"${OUT_DIR}/route.json"
+  bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json" || { log "system.sh failed"; exit 1; }
+  bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json" || { log "network.sh failed"; exit 1; }
+  bash "${ROOT_DIR}/collect/route.sh" >"${OUT_DIR}/route.json" || { log "route.sh failed"; exit 1; }
 
   python3 - <<'PY' "${OUT_DIR}"
 import json, pathlib, sys
