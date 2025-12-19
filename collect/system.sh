@@ -26,8 +26,8 @@ cpu_bench_source="sysbench"
 
 run_sysbench() {
   local threads="$1"
-  local prime="${SYSBENCH_PRIME:-20000}"
-  local duration="${SYSBENCH_TIME:-5}"
+  local prime="${SYSBENCH_PRIME:-80000}"
+  local duration="${SYSBENCH_TIME:-15}"
   local out status
   out="$(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>&1)"
   status=$?
@@ -61,7 +61,7 @@ PY
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
     local val; val="$(run_sysbench 1 || true)"
-    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 5000 ]; then
       cpu_bench_source="estimate-bogomips"
       python3 - <<PY "$cpu_bogomips"
 import sys
@@ -81,7 +81,7 @@ cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
     local val; val="$(run_sysbench "${threads}" || true)"
-    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 30000 ]; then
       cpu_bench_source="estimate-bogomips"
       python3 - <<PY "$cpu_bogomips" "${cpu_cores}"
 import sys
