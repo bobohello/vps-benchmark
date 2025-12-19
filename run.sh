@@ -14,7 +14,11 @@ log() {
 
 run_collect() {
   log "开始数据采集 -> ${OUT_DIR}"
-  bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json" || { log "system.sh failed"; exit 1; }
+  if ! bash "${ROOT_DIR}/collect/system.sh" >"${OUT_DIR}/system.json"; then
+    log "system.sh failed"
+    cat "${OUT_DIR}/system.json" 2>/dev/null || true
+    exit 1
+  fi
   bash "${ROOT_DIR}/collect/network.sh" >"${OUT_DIR}/network.json" || { log "network.sh failed"; exit 1; }
   bash "${ROOT_DIR}/collect/route.sh" >"${OUT_DIR}/route.json" || { log "route.sh failed"; exit 1; }
 
