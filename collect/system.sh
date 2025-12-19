@@ -17,6 +17,19 @@ disk_used_bytes="$(awk '{print $3}' <<<"${disk_line:-0}")"
 
 # CPU 基准（若无 sysbench 则回退估算，并标注来源）
 cpu_bench_source="sysbench"
+SB_TIMEOUT="${SYSBENCH_TIMEOUT:-15}"
+
+run_sysbench() {
+  # $1: threads
+  local threads="$1"
+  local prime="${SYSBENCH_PRIME:-40000}"
+  local duration="${SYSBENCH_TIME:-8}"
+  local cmd=(sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run)
+  if command -v timeout >/dev/null 2>&1; then
+    cmd=(timeout "${SB_TIMEOUT}s" "${cmd[@]}")
+  fi
+  "${cmd[@]}" 2>/dev/null | cpu_bench_parse
+}
 
 cpu_bench_parse() {
   # 从 sysbench 输出中解析 events/s，若未直接给出则用 total events / total time
@@ -47,10 +60,14 @@ PY
 
 cpu_bench_single() {
   if command -v sysbench >/dev/null 2>&1; then
-    local prime="${SYSBENCH_PRIME:-40000}"
-    local duration="${SYSBENCH_TIME:-8}"
-    sysbench cpu --cpu-max-prime="${prime}" --threads=1 --time="${duration}" --events=0 run 2>/dev/null \
-      | cpu_bench_parse
+    local val
+    val="$(run_sysbench 1)"
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
+      cpu_bench_source="estimate"
+      echo 2000
+    else
+      echo "$val"
+    fi
   else
     cpu_bench_source="estimate"
     echo 2000
@@ -60,10 +77,14 @@ cpu_bench_single() {
 cpu_bench_multi() {
   local threads="${cpu_cores:-1}"
   if command -v sysbench >/dev/null 2>&1; then
-    local prime="${SYSBENCH_PRIME:-40000}"
-    local duration="${SYSBENCH_TIME:-8}"
-    sysbench cpu --cpu-max-prime="${prime}" --threads="${threads}" --time="${duration}" --events=0 run 2>/dev/null \
-      | cpu_bench_parse
+    local val
+    val="$(run_sysbench "${threads}")"
+    if [ -z "$val" ] || [ "$(printf '%.0f' "$val" 2>/dev/null || echo 0)" -le 0 ]; then
+      cpu_bench_source="estimate"
+      echo $((cpu_cores * 4000))
+    else
+      echo "$val"
+    fi
   else
     cpu_bench_source="estimate"
     echo $((cpu_cores * 4000))
