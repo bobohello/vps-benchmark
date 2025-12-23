@@ -47,6 +47,7 @@ output/
 *.tmp
 
 # 文章和推广资源（不提交到仓库）
+文章/
 ARTICLE_CN.md
 ARTICLE_EN.md
 SOCIAL_MEDIA_POST.md
