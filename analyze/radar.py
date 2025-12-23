@@ -98,10 +98,11 @@ def build_radar(scores: dict, output: Path) -> None:
             color="#111827",
         )
 
-    # 可选：在图下方展示 CPU/Disk 采集信息
+    # 可选：在图下方展示 CPU/Disk/Bandwidth 采集信息
     meta = scores.get("meta", {})
     cpu_info = meta.get("cpu_info") or {}
     disk_info = meta.get("disk_info") or {}
+    bandwidth_info = meta.get("bandwidth_info") or {}
     info_lines = []
     if cpu_info:
         model = cpu_info.get("model", "CPU")
@@ -114,6 +115,13 @@ def build_radar(scores: dict, output: Path) -> None:
         w = disk_info.get("write_MB_s", 0)
         r = disk_info.get("read_MB_s", 0)
         info_lines.append(f"Disk: write={w} MB/s, read={r} MB/s")
+    if bandwidth_info:
+        bw = bandwidth_info.get("bandwidth_mbps", 0)
+        latency = bandwidth_info.get("latency_ms", 0)
+        jitter = bandwidth_info.get("jitter_ms", 0)
+        loss = bandwidth_info.get("packet_loss_pct", 0)
+        info_lines.append(f"Bandwidth: {bw} Mbps")
+        info_lines.append(f"  latency={latency}ms, jitter={jitter}ms, loss={loss}%")
     if info_lines:
         plt.gcf().text(0.02, 0.02, "\n".join(info_lines), ha="left", va="bottom", fontsize=8, color="#111827")
 

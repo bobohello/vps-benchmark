@@ -161,6 +161,12 @@ def calc_scores(raw: dict) -> dict:
                 "write_MB_s": disk.get("write_MB_s"),
                 "read_MB_s": disk.get("read_MB_s"),
             },
+            "bandwidth_info": {
+                "bandwidth_mbps": bandwidth_val,
+                "latency_ms": net.get("latency_ms"),
+                "jitter_ms": net.get("jitter_ms"),
+                "packet_loss_pct": net.get("packet_loss_pct"),
+            },
         },
     }
 
