@@ -85,7 +85,7 @@ b = float(sys.argv[1]) if sys.argv[1] else 1.0
 print(f"{b*0.5:.2f}")
 PY
     else
-      echo 2000
+    echo 2000
     fi
   fi
 }
@@ -118,7 +118,7 @@ c = float(sys.argv[2]) if sys.argv[2] else 1.0
 print(f"{b*0.5*c*0.85:.2f}")
 PY
     else
-      echo $((threads * 4000))
+    echo $((threads * 4000))
     fi
   fi
 }
