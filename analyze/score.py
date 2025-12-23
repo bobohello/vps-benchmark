@@ -103,7 +103,7 @@ def calc_scores(raw: dict) -> dict:
 
     bench_single = cpu.get("bench_single") or 0
     bench_multi = cpu.get("bench_multi") or 0
-    
+
     # 只在真正使用估算值时才做兜底处理，保留sysbench的真实结果
     if cpu_source != "sysbench":
         # 仅当使用估算值（非sysbench）时，才给一个合理的兜底值

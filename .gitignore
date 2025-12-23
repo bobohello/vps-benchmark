@@ -1,3 +1,62 @@
-﻿output/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output files
+output/
+*.log
+
+# Temporary files
+/tmp/
+*.tmp
+
+# 文章和推广资源（不提交到仓库）
+ARTICLE_CN.md
+ARTICLE_EN.md
+SOCIAL_MEDIA_POST.md
+IMAGE_GUIDE.md
+PUBLISHING_STRATEGY.md
+QUICK_PUBLISH_CHECKLIST.md
+README_ARTICLES.md
+
+# 测试文件
+测试/
+
+# 其他文档
+一键脚本.sh
