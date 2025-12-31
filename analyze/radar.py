@@ -98,47 +98,83 @@ def build_radar(scores: dict, output: Path) -> None:
             fontsize=9,
             color="#111827",
         )
-
-    # 可选：在图下方展示 CPU/Memory/Disk/Bandwidth 采集信息
+    
+    # 获取详细信息
     meta = scores.get("meta", {})
     cpu_info = meta.get("cpu_info") or {}
     memory_info = meta.get("memory_info") or {}
     disk_info = meta.get("disk_info") or {}
     bandwidth_info = meta.get("bandwidth_info") or {}
-    info_lines = []
+
+    # 为每个维度添加详细信息标注（显示在维度标签旁边）
+    # 使用英文和数字避免中文乱码问题
+    detail_texts = {
+        "latency": None,
+        "stability": None,
+        "bandwidth": None,
+        "cpu": None,
+        "memory": None,
+        "disk": None,
+        "route": None,
+    }
+    
     if cpu_info:
-        model = cpu_info.get("model", "CPU")
         cores = cpu_info.get("cores", 0)
         single = cpu_info.get("bench_single", 0)
         multi = cpu_info.get("bench_multi", 0)
-        source = cpu_info.get("source", "unknown")
-        info_lines.append(f"CPU: {model} ({cores}核)")
-        info_lines.append(f"  single={single}, multi={multi}, src={source}")
+        detail_texts["cpu"] = f"{cores}cores, s={single:.0f}, m={multi:.0f}"
+    
     if memory_info:
         total_gb = memory_info.get("total_kb", 0) / 1024 / 1024
         read_speed = memory_info.get("speed_read_MiB_s", 0)
         write_speed = memory_info.get("speed_write_MiB_s", 0)
         if read_speed > 0 or write_speed > 0:
-            info_lines.append(f"Memory: {total_gb:.1f}GB, read={read_speed:.0f} MiB/s, write={write_speed:.0f} MiB/s")
+            detail_texts["memory"] = f"{total_gb:.1f}GB, r={read_speed:.0f}, w={write_speed:.0f}"
         else:
-            info_lines.append(f"Memory: {total_gb:.1f}GB")
+            detail_texts["memory"] = f"{total_gb:.1f}GB"
+    
     if disk_info:
         w = disk_info.get("write_MB_s", 0)
         r = disk_info.get("read_MB_s", 0)
-        info_lines.append(f"Disk: write={w} MB/s, read={r} MB/s")
+        detail_texts["disk"] = f"w={w:.0f}MB/s, r={r:.0f}MB/s"
+    
     if bandwidth_info:
         bw = bandwidth_info.get("bandwidth_mbps", 0)
-        latency = bandwidth_info.get("latency_ms", 0)
-        jitter = bandwidth_info.get("jitter_ms", 0)
-        loss = bandwidth_info.get("packet_loss_pct", 0)
-        info_lines.append(f"Bandwidth: {bw} Mbps")
-        info_lines.append(f"  latency={latency}ms, jitter={jitter}ms, loss={loss}%")
-    if info_lines:
-        plt.gcf().text(0.02, 0.02, "\n".join(info_lines), ha="left", va="bottom", fontsize=8, color="#111827")
+        detail_texts["bandwidth"] = f"{bw:.1f}Mbps"
+    
+    # 在维度标签外侧显示详细信息
+    for angle, dim in zip(angles[:-1], DIMENSIONS):
+        if detail_texts[dim]:
+            # 计算标注位置（在标签外侧稍远处）
+            label_radius = 115  # 比标签稍远
+            x = angle
+            y = label_radius
+            ax.text(
+                x,
+                y,
+                detail_texts[dim],
+                ha="center",
+                va="center",
+                fontsize=7,
+                color="#6b7280",
+                style="italic",
+            )
+    
+    # 在图底部显示CPU型号（使用纯英文数字，避免中文乱码）
+    if cpu_info:
+        model = cpu_info.get("model", "CPU")
+        plt.gcf().text(
+            0.5, 0.02, 
+            f"CPU: {model}", 
+            ha="center", 
+            va="bottom", 
+            fontsize=8, 
+            color="#374151"
+        )
 
     plt.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output, dpi=180)
+    plt.savefig(output, dpi=180, bbox_inches='tight', pad_inches=0.3)
     plt.close()
 
 
