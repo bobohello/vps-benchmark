@@ -174,12 +174,17 @@ def build_radar(scores: dict, output: Path) -> None:
             # 根据角度调整水平对齐方式，避免重叠
             angle_deg = degrees(angle)
             
-            # 调整对齐方式：右侧用左对齐，左侧用右对齐，上下用居中
-            # 特别处理 Bandwidth 位置（右下角），使用更大的偏移
+            # 针对每个维度进行特殊优化
             if dim == "bandwidth":
+                # Bandwidth 在右下角，使用更大的偏移
                 ha = "left"
-                label_radius = 125  # Bandwidth 需要更大的偏移
-                va = "center"
+                label_radius = 128
+                va = "top"  # 参数显示在下方
+            elif dim == "stability":
+                # Stability 在右上角，使用更大的偏移
+                ha = "left"
+                label_radius = 128
+                va = "bottom"  # 参数显示在上方
             elif -45 <= angle_deg <= 45:  # 右侧（CPU等）
                 ha = "left"
                 label_radius = 120
@@ -192,11 +197,12 @@ def build_radar(scores: dict, output: Path) -> None:
                 ha = "center"
                 va = "center"
             
-            # 垂直对齐微调
-            if angle_deg > 80 and angle_deg < 100:  # 顶部
-                va = "bottom"
-            elif angle_deg > -100 and angle_deg < -80:  # 底部
-                va = "top"
+            # 垂直对齐微调（如果没有被上面的特殊处理覆盖）
+            if dim not in ["bandwidth", "stability"]:
+                if angle_deg > 80 and angle_deg < 100:  # 顶部
+                    va = "bottom"
+                elif angle_deg > -100 and angle_deg < -80:  # 底部
+                    va = "top"
             
             ax.text(
                 angle,
