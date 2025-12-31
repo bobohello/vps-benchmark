@@ -4,7 +4,7 @@
 """
 import argparse
 import json
-from math import pi
+from math import pi, degrees
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -118,43 +118,79 @@ def build_radar(scores: dict, output: Path) -> None:
         "route": None,
     }
     
+    # Latency 维度：显示延迟值
+    if bandwidth_info:
+        latency_ms = bandwidth_info.get("latency_ms", 0)
+        if latency_ms > 0:
+            detail_texts["latency"] = f"{latency_ms:.2f}ms"
+    
+    # Stability 维度：显示抖动和丢包
+    if bandwidth_info:
+        jitter = bandwidth_info.get("jitter_ms", 0)
+        loss = bandwidth_info.get("packet_loss_pct", 0)
+        detail_texts["stability"] = f"jitter={jitter:.2f}ms, loss={loss:.1f}%"
+    
+    # Bandwidth 维度：显示带宽
+    if bandwidth_info:
+        bw = bandwidth_info.get("bandwidth_mbps", 0)
+        detail_texts["bandwidth"] = f"{bw:.1f}Mbps"
+    
+    # CPU 维度：显示核心数和跑分
     if cpu_info:
         cores = cpu_info.get("cores", 0)
         single = cpu_info.get("bench_single", 0)
         multi = cpu_info.get("bench_multi", 0)
         detail_texts["cpu"] = f"{cores}cores, s={single:.0f}, m={multi:.0f}"
     
+    # Memory 维度：显示容量和速度（带单位）
     if memory_info:
         total_gb = memory_info.get("total_kb", 0) / 1024 / 1024
         read_speed = memory_info.get("speed_read_MiB_s", 0)
         write_speed = memory_info.get("speed_write_MiB_s", 0)
         if read_speed > 0 or write_speed > 0:
-            detail_texts["memory"] = f"{total_gb:.1f}GB, r={read_speed:.0f}, w={write_speed:.0f}"
+            detail_texts["memory"] = f"{total_gb:.1f}GB, r={read_speed:.0f}MiB/s, w={write_speed:.0f}MiB/s"
         else:
             detail_texts["memory"] = f"{total_gb:.1f}GB"
     
+    # Disk 维度：显示读写速度
     if disk_info:
         w = disk_info.get("write_MB_s", 0)
         r = disk_info.get("read_MB_s", 0)
         detail_texts["disk"] = f"w={w:.0f}MB/s, r={r:.0f}MB/s"
     
-    if bandwidth_info:
-        bw = bandwidth_info.get("bandwidth_mbps", 0)
-        detail_texts["bandwidth"] = f"{bw:.1f}Mbps"
-    
     # 在维度标签外侧显示详细信息
-    for angle, dim in zip(angles[:-1], DIMENSIONS):
+    for i, (angle, dim) in enumerate(zip(angles[:-1], DIMENSIONS)):
         if detail_texts[dim]:
             # 计算标注位置（在标签外侧稍远处）
-            label_radius = 115  # 比标签稍远
-            x = angle
-            y = label_radius
+            label_radius = 118  # 比标签稍远
+            
+            # 根据角度调整水平对齐方式，避免重叠
+            angle_deg = degrees(angle)
+            
+            # 调整对齐方式：右侧用左对齐，左侧用右对齐，上下用居中
+            if -45 <= angle_deg <= 45:  # 右侧
+                ha = "left"
+                label_radius = 120
+            elif 135 <= angle_deg or angle_deg <= -135:  # 左侧
+                ha = "right"
+                label_radius = 120
+            else:  # 上下
+                ha = "center"
+            
+            # 垂直对齐
+            if angle_deg > 80 and angle_deg < 100:  # 顶部
+                va = "bottom"
+            elif angle_deg > -100 and angle_deg < -80:  # 底部
+                va = "top"
+            else:
+                va = "center"
+            
             ax.text(
-                x,
-                y,
+                angle,
+                label_radius,
                 detail_texts[dim],
-                ha="center",
-                va="center",
+                ha=ha,
+                va=va,
                 fontsize=7,
                 color="#6b7280",
                 style="italic",
