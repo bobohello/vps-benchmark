@@ -53,12 +53,13 @@ plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["font.sans-serif"] = font_family
 plt.rcParams["axes.unicode_minus"] = False
 
-DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "disk", "route"]
+DIMENSIONS = ["latency", "stability", "bandwidth", "cpu", "memory", "disk", "route"]
 LABELS = {
     "latency": "Latency",
     "stability": "Stability",
     "bandwidth": "Bandwidth",
     "cpu": "CPU",
+    "memory": "Memory",
     "disk": "Disk",
     "route": "Route",
 }
@@ -98,19 +99,29 @@ def build_radar(scores: dict, output: Path) -> None:
             color="#111827",
         )
 
-    # 可选：在图下方展示 CPU/Disk/Bandwidth 采集信息
+    # 可选：在图下方展示 CPU/Memory/Disk/Bandwidth 采集信息
     meta = scores.get("meta", {})
     cpu_info = meta.get("cpu_info") or {}
+    memory_info = meta.get("memory_info") or {}
     disk_info = meta.get("disk_info") or {}
     bandwidth_info = meta.get("bandwidth_info") or {}
     info_lines = []
     if cpu_info:
         model = cpu_info.get("model", "CPU")
+        cores = cpu_info.get("cores", 0)
         single = cpu_info.get("bench_single", 0)
         multi = cpu_info.get("bench_multi", 0)
         source = cpu_info.get("source", "unknown")
-        info_lines.append(f"CPU: {model}")
+        info_lines.append(f"CPU: {model} ({cores}核)")
         info_lines.append(f"  single={single}, multi={multi}, src={source}")
+    if memory_info:
+        total_gb = memory_info.get("total_kb", 0) / 1024 / 1024
+        read_speed = memory_info.get("speed_read_MiB_s", 0)
+        write_speed = memory_info.get("speed_write_MiB_s", 0)
+        if read_speed > 0 or write_speed > 0:
+            info_lines.append(f"Memory: {total_gb:.1f}GB, read={read_speed:.0f} MiB/s, write={write_speed:.0f} MiB/s")
+        else:
+            info_lines.append(f"Memory: {total_gb:.1f}GB")
     if disk_info:
         w = disk_info.get("write_MB_s", 0)
         r = disk_info.get("read_MB_s", 0)

@@ -148,10 +148,79 @@ disk_read() {
   rm -f "$tmp" /tmp/ddlog.$$ /tmp/ddlog_read.$$ 2>/dev/null || true
 }
 
+# 内存速度测试（使用 sysbench memory）
+mem_speed_read() {
+  if ! command -v sysbench >/dev/null 2>&1; then
+    echo 0
+    return
+  fi
+  local out; out="$(sysbench memory --memory-oper=read --memory-block-size=1M --memory-total-size=2G --threads=1 run 2>&1 || true)"
+  if [ -z "$out" ]; then
+    echo 0
+    return
+  fi
+  python3 - <<PY "$out"
+import sys, re
+text = sys.argv[1]
+# 提取 transferred (xxxx MiB/sec)
+m = re.search(r'transferred \(([0-9.]+)\s+MiB/sec\)', text)
+if m:
+    print(f"{float(m.group(1)):.2f}")
+else:
+    # 尝试提取 total time 和 total size 计算速度
+    m_size = re.search(r'total size:\s*([0-9.]+)\s*MiB', text)
+    m_time = re.search(r'total time:\s*([0-9.]+)s', text)
+    if m_size and m_time:
+        size = float(m_size.group(1))
+        time = float(m_time.group(1))
+        if time > 0:
+            print(f"{size/time:.2f}")
+        else:
+            print("0")
+    else:
+        print("0")
+PY
+}
+
+mem_speed_write() {
+  if ! command -v sysbench >/dev/null 2>&1; then
+    echo 0
+    return
+  fi
+  local out; out="$(sysbench memory --memory-oper=write --memory-block-size=1M --memory-total-size=2G --threads=1 run 2>&1 || true)"
+  if [ -z "$out" ]; then
+    echo 0
+    return
+  fi
+  python3 - <<PY "$out"
+import sys, re
+text = sys.argv[1]
+# 提取 transferred (xxxx MiB/sec)
+m = re.search(r'transferred \(([0-9.]+)\s+MiB/sec\)', text)
+if m:
+    print(f"{float(m.group(1)):.2f}")
+else:
+    # 尝试提取 total time 和 total size 计算速度
+    m_size = re.search(r'total size:\s*([0-9.]+)\s*MiB', text)
+    m_time = re.search(r'total time:\s*([0-9.]+)s', text)
+    if m_size and m_time:
+        size = float(m_size.group(1))
+        time = float(m_time.group(1))
+        if time > 0:
+            print(f"{size/time:.2f}")
+        else:
+            print("0")
+    else:
+        print("0")
+PY
+}
+
 CPU_SINGLE="$(cpu_bench_single)"
 CPU_MULTI="$(cpu_bench_multi)"
 DISK_WRITE_MB_S="$(disk_write)"
 DISK_READ_MB_S="$(disk_read)"
+MEM_SPEED_READ_MIB_S="$(mem_speed_read)"
+MEM_SPEED_WRITE_MIB_S="$(mem_speed_write)"
 
 cat <<EOF
 {
@@ -165,7 +234,9 @@ cat <<EOF
   },
   "memory": {
     "total_kb": ${mem_total_kb:-0},
-    "available_kb": ${mem_free_kb:-0}
+    "available_kb": ${mem_free_kb:-0},
+    "speed_read_MiB_s": ${MEM_SPEED_READ_MIB_S:-0},
+    "speed_write_MiB_s": ${MEM_SPEED_WRITE_MIB_S:-0}
   },
   "disk": {
     "total_bytes": ${disk_total_bytes:-0},

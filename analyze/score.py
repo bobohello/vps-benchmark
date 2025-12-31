@@ -19,28 +19,34 @@ BEST = {
     "cpu_multi_per_core": 150,  # 每核的优秀性能
     "disk_write_MB_s": 800,
     "disk_read_MB_s": 600,
+    # 内存参考值：基于 sysbench memory 测试，DDR4-3200/DDR5 高速内存
+    "memory_read_MiB_s": 20000,  # 高端DDR4/DDR5 读取速度
+    "memory_write_MiB_s": 15000,  # 高端DDR4/DDR5 写入速度
 }
 
 PROFILE_WEIGHTS = {
     "web_hosting": {
-        "latency": 0.25,
-        "stability": 0.25,
-        "disk": 0.20,
+        "latency": 0.22,
+        "stability": 0.22,
+        "disk": 0.18,
         "cpu": 0.15,
-        "bandwidth": 0.15,
+        "memory": 0.13,
+        "bandwidth": 0.10,
     },
     "proxy": {
-        "latency": 0.35,
-        "bandwidth": 0.30,
-        "stability": 0.20,
+        "latency": 0.33,
+        "bandwidth": 0.28,
+        "stability": 0.18,
         "cpu": 0.10,
+        "memory": 0.06,
         "disk": 0.05,
     },
     "compute": {
-        "cpu": 0.40,
-        "disk": 0.35,
-        "stability": 0.15,
-        "latency": 0.10,
+        "cpu": 0.35,
+        "memory": 0.25,
+        "disk": 0.25,
+        "stability": 0.10,
+        "latency": 0.05,
         "bandwidth": 0.00,
     },
 }
@@ -128,11 +134,25 @@ def calc_scores(raw: dict) -> dict:
     disk_read_score = normalize(disk.get("read_MB_s"), BEST["disk_read_MB_s"], True)
     disk_score = 0.8 * disk_write_score + 0.2 * disk_read_score
 
+    # 内存评分
+    memory = sysinfo.get("memory", {})
+    mem_read = memory.get("speed_read_MiB_s") or 0
+    mem_write = memory.get("speed_write_MiB_s") or 0
+    
+    # 如果内存速度测试失败或未执行，给一个中等分数（不要0分）
+    if mem_read <= 0 or mem_write <= 0:
+        memory_score = 50.0  # 默认中等分
+    else:
+        mem_read_score = normalize(mem_read, BEST["memory_read_MiB_s"], True)
+        mem_write_score = normalize(mem_write, BEST["memory_write_MiB_s"], True)
+        memory_score = 0.6 * mem_read_score + 0.4 * mem_write_score
+
     dimensions = {
         "latency": normalize(net.get("latency_ms"), BEST["latency_ms"], False),
         "stability": stability,
         "bandwidth": normalize(bandwidth_val, BEST["bandwidth_mbps"], True),
         "cpu": cpu_score,
+        "memory": memory_score,
         "disk": disk_score,
         "route": route_score(raw.get("route", {})),
     }
@@ -149,13 +169,19 @@ def calc_scores(raw: dict) -> dict:
         "profiles": profiles,
         "meta": {
             "generated_at": datetime.utcnow().isoformat() + "Z",
-            "model": "v0.3",
+            "model": "v0.4",
             "cpu_info": {
                 "model": cpu.get("model"),
                 "cores": cores,
                 "bench_single": bench_single,
                 "bench_multi": bench_multi,
                 "source": cpu_source,
+            },
+            "memory_info": {
+                "total_kb": memory.get("total_kb"),
+                "available_kb": memory.get("available_kb"),
+                "speed_read_MiB_s": mem_read,
+                "speed_write_MiB_s": mem_write,
             },
             "disk_info": {
                 "write_MB_s": disk.get("write_MB_s"),
