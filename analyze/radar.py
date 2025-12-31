@@ -158,6 +158,13 @@ def build_radar(scores: dict, output: Path) -> None:
         r = disk_info.get("read_MB_s", 0)
         detail_texts["disk"] = f"w={w:.0f}MB/s, r={r:.0f}MB/s"
     
+    # Route 维度：显示跳数和最大RTT
+    route_info = meta.get("route_info") or {}
+    hops = route_info.get("hop_count", 0)
+    max_rtt = route_info.get("max_rtt_ms", 0)
+    if hops > 0 or max_rtt > 0:
+        detail_texts["route"] = f"{hops}hops, max={max_rtt:.1f}ms"
+    
     # 在维度标签外侧显示详细信息
     for i, (angle, dim) in enumerate(zip(angles[:-1], DIMENSIONS)):
         if detail_texts[dim]:
@@ -168,22 +175,28 @@ def build_radar(scores: dict, output: Path) -> None:
             angle_deg = degrees(angle)
             
             # 调整对齐方式：右侧用左对齐，左侧用右对齐，上下用居中
-            if -45 <= angle_deg <= 45:  # 右侧
+            # 特别处理 Bandwidth 位置（右下角），使用更大的偏移
+            if dim == "bandwidth":
+                ha = "left"
+                label_radius = 125  # Bandwidth 需要更大的偏移
+                va = "center"
+            elif -45 <= angle_deg <= 45:  # 右侧（CPU等）
                 ha = "left"
                 label_radius = 120
-            elif 135 <= angle_deg or angle_deg <= -135:  # 左侧
+                va = "center"
+            elif 135 <= angle_deg or angle_deg <= -135:  # 左侧（Route, Disk等）
                 ha = "right"
                 label_radius = 120
+                va = "center"
             else:  # 上下
                 ha = "center"
+                va = "center"
             
-            # 垂直对齐
+            # 垂直对齐微调
             if angle_deg > 80 and angle_deg < 100:  # 顶部
                 va = "bottom"
             elif angle_deg > -100 and angle_deg < -80:  # 底部
                 va = "top"
-            else:
-                va = "center"
             
             ax.text(
                 angle,

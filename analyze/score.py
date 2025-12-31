@@ -95,6 +95,7 @@ def calc_scores(raw: dict) -> dict:
     sysinfo = raw.get("system", {})
     disk = sysinfo.get("disk", {})
     cpu = sysinfo.get("cpu", {})
+    route = raw.get("route", {})
     cores = cpu.get("cores") or 0
     cpu_source = cpu.get("bench_source") or "unknown"
 
@@ -192,6 +193,10 @@ def calc_scores(raw: dict) -> dict:
                 "latency_ms": net.get("latency_ms"),
                 "jitter_ms": net.get("jitter_ms"),
                 "packet_loss_pct": net.get("packet_loss_pct"),
+            },
+            "route_info": {
+                "hop_count": route.get("hop_count"),
+                "max_rtt_ms": route.get("max_rtt_ms"),
             },
         },
     }
